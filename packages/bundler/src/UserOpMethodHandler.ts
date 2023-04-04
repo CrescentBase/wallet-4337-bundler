@@ -7,7 +7,7 @@ import { deepHexlify, erc4337RuntimeVersion } from '@account-abstraction/utils'
 import { UserOperationStruct, EntryPoint } from '@account-abstraction/contracts'
 import { UserOperationEventEvent } from '@account-abstraction/contracts/dist/types/EntryPoint'
 import { calcPreVerificationGas } from '@account-abstraction/sdk'
-import { requireCond, RpcError, tostr } from './utils'
+import {estimateGas, requireCond, RpcError, tostr} from './utils'
 import { ExecutionManager } from './modules/ExecutionManager'
 import { getAddr } from './modules/moduleUtils'
 import { UserOperationByHashResponse, UserOperationReceipt } from './RpcTypes'
@@ -101,11 +101,15 @@ export class UserOpMethodHandler {
     const userOp = {
       ...await resolveProperties(userOp1),
       // default values for missing fields.
-      paymasterAndData: '0x',
+      // paymasterAndData: '0x',
       maxFeePerGas: 0,
       maxPriorityFeePerGas: 0,
       preVerificationGas: 0,
       verificationGasLimit: 10e6
+    }
+
+    if (!userOp.paymasterAndData) {
+      userOp.paymasterAndData = '0x';
     }
 
     // todo: checks the existence of parameters, but since we hexlify the inputs, it fails to validate
@@ -127,14 +131,22 @@ export class UserOpMethodHandler {
       validUntil
     } = returnInfo
 
-    const callGasLimit = await this.provider.estimateGas({
+    const { expandedGas, gas } = await estimateGas(this.provider, {
       from: this.entryPoint.address,
       to: userOp.sender,
       data: userOp.callData
-    }).then(b => b.toNumber()).catch(err => {
+    }).catch(err => {
       const message = err.message.match(/reason="(.*?)"/)?.at(1) ?? 'execution reverted'
       throw new RpcError(message, ExecutionErrors.UserOperationReverted)
-    })
+    });
+    // const callGasLimit = await this.provider.estimateGas({
+    //   from: this.entryPoint.address,
+    //   to: userOp.sender,
+    //   data: userOp.callData
+    // }).then(b => b.toNumber()).catch(err => {
+    //   const message = err.message.match(/reason="(.*?)"/)?.at(1) ?? 'execution reverted'
+    //   throw new RpcError(message, ExecutionErrors.UserOperationReverted)
+    // })
     validAfter = BigNumber.from(validAfter)
     validUntil = BigNumber.from(validUntil)
     if (validUntil === BigNumber.from(0)) {
@@ -143,14 +155,16 @@ export class UserOpMethodHandler {
     if (validAfter === BigNumber.from(0)) {
       validAfter = undefined
     }
-    const preVerificationGas = calcPreVerificationGas(userOp)
-    const verificationGas = BigNumber.from(preOpGas).toNumber()
+    // const preVerificationGas = calcPreVerificationGas(userOp)
+    const preVerificationGas = parseInt((calcPreVerificationGas(userOp) * 1.2).toFixed(0));
+    // const verificationGas = BigNumber.from(preOpGas).toNumber()
+    const verificationGas = parseInt((BigNumber.from(preOpGas).toNumber() * 1.55).toFixed(0));
     return {
       preVerificationGas,
       verificationGas,
       validAfter,
       validUntil,
-      callGasLimit
+      callGasLimit: expandedGas.toNumber()
     }
   }
 
@@ -165,9 +179,31 @@ export class UserOpMethodHandler {
     return await this.entryPoint.getUserOpHash(userOp)
   }
 
-  async _getUserOperationEvent (userOpHash: string): Promise<UserOperationEventEvent> {
+  async _getUserOperationEvent (userOpHash: string, fromBlock: number | undefined): Promise<UserOperationEventEvent> {
     // TODO: eth_getLogs is throttled. must be acceptable for finding a UserOperation by hash
-    const event = await this.entryPoint.queryFilter(this.entryPoint.filters.UserOperationEvent(userOpHash))
+    const baseBlock = 1000;
+
+    const nowBlock = await this.provider.getBlockNumber();
+
+    let toBlock;
+    if (fromBlock) {
+      if (fromBlock > nowBlock) {
+        fromBlock = nowBlock;
+        toBlock = undefined;
+      } else {
+        toBlock = fromBlock + baseBlock;
+        if (toBlock > nowBlock) {
+          toBlock = nowBlock;
+        }
+      }
+    } else {
+      toBlock = nowBlock;
+      fromBlock = toBlock - baseBlock;
+      if (fromBlock < 0) {
+        fromBlock = 0;
+      }
+    }
+    const event = await this.entryPoint.queryFilter(this.entryPoint.filters.UserOperationEvent(userOpHash), fromBlock, toBlock)
     return event[0]
   }
 
@@ -197,9 +233,9 @@ export class UserOpMethodHandler {
     return logs.slice(startIndex + 1, endIndex)
   }
 
-  async getUserOperationByHash (userOpHash: string): Promise<UserOperationByHashResponse | null> {
+  async getUserOperationByHash (userOpHash: string, fromBlock: number | undefined): Promise<UserOperationByHashResponse | null> {
     requireCond(userOpHash?.toString()?.match(HEX_REGEX) != null, 'Missing/invalid userOpHash', -32601)
-    const event = await this._getUserOperationEvent(userOpHash)
+    const event = await this._getUserOperationEvent(userOpHash, fromBlock)
     if (event == null) {
       return null
     }
@@ -255,9 +291,9 @@ export class UserOpMethodHandler {
     })
   }
 
-  async getUserOperationReceipt (userOpHash: string): Promise<UserOperationReceipt | null> {
+  async getUserOperationReceipt (userOpHash: string, fromBlock: number | undefined): Promise<UserOperationReceipt | null> {
     requireCond(userOpHash?.toString()?.match(HEX_REGEX) != null, 'Missing/invalid userOpHash', -32601)
-    const event = await this._getUserOperationEvent(userOpHash)
+    const event = await this._getUserOperationEvent(userOpHash, fromBlock)
     if (event == null) {
       return null
     }
@@ -277,6 +313,6 @@ export class UserOpMethodHandler {
 
   clientVersion (): string {
     // eslint-disable-next-line
-    return 'aa-bundler/' + erc4337RuntimeVersion + (this.config.unsafe ? '/unsafe' : '')
+    return 'crescent-bundler/' + erc4337RuntimeVersion + (this.config.unsafe ? '/unsafe' : '')
   }
 }

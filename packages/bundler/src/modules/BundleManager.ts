@@ -8,7 +8,7 @@ import { ReputationManager, ReputationStatus } from './ReputationManager'
 import { Mutex } from 'async-mutex'
 import { GetUserOpHashes__factory } from '../types'
 import { StorageMap, UserOperation } from './Types'
-import { getAddr, mergeStorageMap, runContractScript } from './moduleUtils'
+import {getAddr, getFeeData, mergeStorageMap, runContractScript} from './moduleUtils'
 import { EventsManager } from './EventsManager'
 import { ErrorDescription } from '@ethersproject/abi/lib/interface'
 
@@ -70,6 +70,14 @@ export class BundleManager {
     await this.eventsManager.handlePastEvents()
   }
 
+  getGasLimit(userOps: UserOperation[]) {
+    let big = BigNumber.from(0);
+    for (const userOp of userOps) {
+      big = big.add(userOp.callGasLimit).add(userOp.verificationGasLimit);
+    }
+    return BigNumber.from((big.toNumber() * 1.2).toFixed(0));
+  }
+
   /**
    * submit a bundle.
    * after submitting the bundle, remove all UserOps from the mempool
@@ -77,13 +85,21 @@ export class BundleManager {
    */
   async sendBundle (userOps: UserOperation[], beneficiary: string, storageMap: StorageMap): Promise<SendBundleReturn | undefined> {
     try {
-      const feeData = await this.provider.getFeeData()
+      debug('start sendBundle', userOps.length)
+      const { maxPriorityFeePerGas, maxFeePerGas, gasPrice } = await getFeeData(this.provider);
+      const gasObj : any = {};
+      if (maxFeePerGas && maxPriorityFeePerGas) {
+        gasObj.type = 2;
+        gasObj.maxPriorityFeePerGas = maxPriorityFeePerGas;
+        gasObj.maxFeePerGas = maxFeePerGas;
+      } else {
+        gasObj.gasPrice = gasPrice ?? undefined;
+      }
       const tx = await this.entryPoint.populateTransaction.handleOps(userOps, beneficiary, {
         type: 2,
         nonce: await this.signer.getTransactionCount(),
-        gasLimit: 10e6,
-        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? 0,
-        maxFeePerGas: feeData.maxFeePerGas ?? 0
+        gasLimit: this.getGasLimit(userOps),
+        ...gasObj
       })
       tx.chainId = this.provider._network.chainId
       const signedTx = await this.signer.signTransaction(tx)
@@ -102,13 +118,16 @@ export class BundleManager {
       // TODO: parse ret, and revert if needed.
       debug('ret=', ret)
       debug('sent handleOps with', userOps.length, 'ops. removing from mempool')
+      console.log("sendBundle ret", ret);
       // hashes are needed for debug rpc only.
       const hashes = await this.getUserOpHashes(userOps)
+      this.mempoolManager.removeAllUserOps(userOps)
       return {
         transactionHash: ret,
         userOpHashes: hashes
       }
     } catch (e: any) {
+      debug('sendBundle e', e);
       let parsedError: ErrorDescription
       try {
         parsedError = this.entryPoint.interface.parseError((e.data?.data ?? e.data))
@@ -196,7 +215,9 @@ export class BundleManager {
       const userOpGasCost = BigNumber.from(validationResult.returnInfo.preOpGas).add(entry.userOp.callGasLimit)
       const newTotalGas = totalGas.add(userOpGasCost)
       if (newTotalGas.gt(this.maxBundleGas)) {
-        break
+        if (bundle.length > 0) {
+          break
+        }
       }
 
       if (paymaster != null) {

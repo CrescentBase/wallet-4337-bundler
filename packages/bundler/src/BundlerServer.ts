@@ -147,10 +147,10 @@ export class BundlerServer {
         result = await this.methodHandler.estimateUserOperationGas(params[0], params[1])
         break
       case 'eth_getUserOperationReceipt':
-        result = await this.methodHandler.getUserOperationReceipt(params[0])
+        result = await this.methodHandler.getUserOperationReceipt(params[0], params[1])
         break
       case 'eth_getUserOperationByHash':
-        result = await this.methodHandler.getUserOperationByHash(params[0])
+        result = await this.methodHandler.getUserOperationByHash(params[0], params[1])
         break
       case 'web3_clientVersion':
         result = this.methodHandler.clientVersion()

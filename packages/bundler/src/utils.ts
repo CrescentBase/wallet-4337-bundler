@@ -1,6 +1,8 @@
-import { JsonRpcProvider } from '@ethersproject/providers'
+import { JsonRpcProvider, Provider } from '@ethersproject/providers'
 import { BigNumberish } from 'ethers/lib/ethers'
 import { BigNumber } from 'ethers'
+import {Deferrable} from "@ethersproject/properties";
+import {TransactionRequest} from "@ethersproject/abstract-provider";
 
 export class RpcError extends Error {
   // error codes from: https://eips.ethereum.org/EIPS/eip-1474
@@ -70,4 +72,19 @@ export async function isGeth (provider: JsonRpcProvider): Promise<boolean> {
   return await supportsRpcMethod(provider, 'debug_traceCall')
   // debug('client version', p._clientVersion)
   // return p._clientVersion?.match('go1') != null
+}
+
+
+export async function estimateGas(provider: Provider, transaction: Deferrable<TransactionRequest>): Promise<{ expandedGas: BigNumber, gas: BigNumber }>  {
+  const { gasLimit } = await provider.getBlock('latest');
+  const estimateGas = await provider.estimateGas(transaction);
+  const maxGasBN = BigNumber.from((gasLimit.toNumber() * 0.9).toFixed(0));
+  const paddedGasBN = BigNumber.from((estimateGas.toNumber() * 1.5).toFixed(0));
+  if (estimateGas.gt(maxGasBN)) {
+    return { expandedGas: estimateGas, gas: estimateGas };
+  }
+  if (paddedGasBN.lt(maxGasBN)) {
+    return { expandedGas: paddedGasBN, gas: estimateGas };
+  }
+  return { expandedGas: maxGasBN, gas: estimateGas };
 }

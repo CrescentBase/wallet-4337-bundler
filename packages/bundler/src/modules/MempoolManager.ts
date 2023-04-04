@@ -145,6 +145,14 @@ export class MempoolManager {
     }
   }
 
+  removeAllUserOps (userOps: UserOperation[]): void {
+    // todo: removing (almost) all userOps from mempool. might use better way than finding and slicing
+    // each one separately...
+    for (const userOp of userOps) {
+      this.removeUserOp(userOp)
+    }
+  }
+
   /**
    * debug: dump mempool content
    */
