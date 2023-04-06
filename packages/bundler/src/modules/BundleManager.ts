@@ -49,14 +49,14 @@ export class BundleManager {
    */
   async sendNextBundle (): Promise<SendBundleReturn | undefined> {
     return await this.mutex.runExclusive(async () => {
-      debug('sendNextBundle')
+      // debug('sendNextBundle')
 
       // first flush mempool from already-included UserOps, by actively scanning past events.
       await this.handlePastEvents()
 
       const [bundle, storageMap] = await this.createBundle()
       if (bundle.length === 0) {
-        debug('sendNextBundle - no bundle to send')
+        // debug('sendNextBundle - no bundle to send')
       } else {
         const beneficiary = await this._selectBeneficiary()
         const ret = await this.sendBundle(bundle, beneficiary, storageMap)
@@ -73,7 +73,7 @@ export class BundleManager {
   getGasLimit(userOps: UserOperation[]) {
     let big = BigNumber.from(0);
     for (const userOp of userOps) {
-      big = big.add(userOp.callGasLimit).add(userOp.verificationGasLimit);
+      big = big.add(userOp.callGasLimit).add(userOp.verificationGasLimit).add(5000);
     }
     const result = BigNumber.from((big.toNumber() * 1.2).toFixed(0));
     if (result.gt(10e6)) {
@@ -181,7 +181,9 @@ export class BundleManager {
 
     const storageMap: StorageMap = {}
     let totalGas = BigNumber.from(0)
-    debug('got mempool of ', entries.length)
+    if (entries.length > 0) {
+      debug('got mempool of ', entries.length)
+    }
     for (const entry of entries) {
       const paymaster = getAddr(entry.userOp.paymasterAndData)
       const factory = getAddr(entry.userOp.initCode)
