@@ -75,7 +75,12 @@ export class BundleManager {
     for (const userOp of userOps) {
       big = big.add(userOp.callGasLimit).add(userOp.verificationGasLimit);
     }
-    return BigNumber.from((big.toNumber() * 1.2).toFixed(0));
+    const result = BigNumber.from((big.toNumber() * 1.2).toFixed(0));
+    if (result.gt(10e6)) {
+      return result;
+    } else {
+      return 10e6;
+    }
   }
 
   /**
