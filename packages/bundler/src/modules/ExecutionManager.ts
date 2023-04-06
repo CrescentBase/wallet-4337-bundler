@@ -80,7 +80,7 @@ export class ExecutionManager {
    * @param force
    */
   async attemptBundle (force = true): Promise<SendBundleReturn | undefined> {
-    debug('attemptBundle force=', force, 'count=', this.mempoolManager.count(), 'max=', this.maxMempoolSize)
+    // debug('attemptBundle force=', force, 'count=', this.mempoolManager.count(), 'max=', this.maxMempoolSize)
     if (force || this.mempoolManager.count() >= this.maxMempoolSize) {
       const ret = await this.bundleManager.sendNextBundle()
       if (this.maxMempoolSize === 0) {
