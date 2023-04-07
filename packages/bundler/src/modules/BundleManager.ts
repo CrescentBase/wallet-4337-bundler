@@ -70,17 +70,18 @@ export class BundleManager {
     await this.eventsManager.handlePastEvents()
   }
 
-  getGasLimit(userOps: UserOperation[]) {
-    let big = BigNumber.from(0);
+  async getGasLimit(chainId, userOps: UserOperation[]) : Promise<BigNumber | number> {
+    let totalGas = BigNumber.from(0);
     for (const userOp of userOps) {
-      big = big.add(userOp.callGasLimit).add(userOp.verificationGasLimit).add(5000);
+      totalGas = totalGas.add(userOp.callGasLimit).add(userOp.verificationGasLimit).add(55000);
     }
-    const result = BigNumber.from((big.toNumber() * 1.5).toFixed(0));
-    if (result.gt(10e6)) {
-      return result;
-    } else {
-      return 10e6;
+
+    totalGas = BigNumber.from((totalGas.toNumber() * 2).toFixed(0));
+    const { gasLimit } = await this.provider.getBlock('latest');
+    if (totalGas.gt(gasLimit)) {
+      return gasLimit;
     }
+    return totalGas;
   }
 
   /**
@@ -100,12 +101,13 @@ export class BundleManager {
       } else {
         gasObj.gasPrice = gasPrice ?? undefined;
       }
+      const chainId = (await this.provider.getNetwork()).chainId;
       const tx = await this.entryPoint.populateTransaction.handleOps(userOps, beneficiary, {
         nonce: await this.signer.getTransactionCount(),
-        gasLimit: this.getGasLimit(userOps),
+        gasLimit: await this.getGasLimit(chainId, userOps),
         ...gasObj
       })
-      tx.chainId = this.provider._network.chainId
+      tx.chainId = chainId;
       const signedTx = await this.signer.signTransaction(tx)
       let ret: string
       if (this.conditionalRpc) {
