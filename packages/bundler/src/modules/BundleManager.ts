@@ -101,7 +101,6 @@ export class BundleManager {
         gasObj.gasPrice = gasPrice ?? undefined;
       }
       const tx = await this.entryPoint.populateTransaction.handleOps(userOps, beneficiary, {
-        type: 2,
         nonce: await this.signer.getTransactionCount(),
         gasLimit: this.getGasLimit(userOps),
         ...gasObj
