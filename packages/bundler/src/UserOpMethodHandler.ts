@@ -158,6 +158,10 @@ export class UserOpMethodHandler {
     // const preVerificationGas = calcPreVerificationGas(userOp)
     const preVerificationGas = parseInt((calcPreVerificationGas(userOp) * 1.2).toFixed(0));
     // const verificationGas = BigNumber.from(preOpGas).toNumber()
+    const chainId = (await this.provider.getNetwork()).chainId;
+    if (chainId === 42161) {
+      preOpGas = BigNumber.from(preOpGas).add(800000).toNumber();
+    }
     const verificationGas = parseInt((BigNumber.from(preOpGas).toNumber() * 1.55).toFixed(0));
     return {
       preVerificationGas,
