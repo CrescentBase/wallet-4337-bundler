@@ -70,7 +70,7 @@ export class BundleManager {
     await this.eventsManager.handlePastEvents()
   }
 
-  async getGasLimit(chainId, userOps: UserOperation[]) : Promise<BigNumber | number> {
+  async getGasLimit(userOps: UserOperation[]) : Promise<BigNumber | number> {
     let totalGas = BigNumber.from(0);
     for (const userOp of userOps) {
       totalGas = totalGas.add(userOp.callGasLimit).add(userOp.verificationGasLimit).add(55000);
@@ -104,7 +104,7 @@ export class BundleManager {
       const chainId = (await this.provider.getNetwork()).chainId;
       const tx = await this.entryPoint.populateTransaction.handleOps(userOps, beneficiary, {
         nonce: await this.signer.getTransactionCount(),
-        gasLimit: await this.getGasLimit(chainId, userOps),
+        gasLimit: await this.getGasLimit(userOps),
         ...gasObj
       })
       tx.chainId = chainId;
