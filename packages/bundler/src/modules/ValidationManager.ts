@@ -41,15 +41,19 @@ export interface ValidateUserOpResult extends ValidationResult {
 const HEX_REGEX = /^0x[a-fA-F\d]*$/i
 
 export class ValidationManager {
+  provider: JsonRpcProvider;
+
   constructor (
     readonly entryPoint: EntryPoint,
     readonly reputationManager: ReputationManager,
     readonly unsafe: boolean) {
+    this.provider = entryPoint.provider as JsonRpcProvider
   }
 
   // standard eth_call to simulateValidation
   async _callSimulateValidation (userOp: UserOperation): Promise<ValidationResult> {
-    const errorResult = await this.entryPoint.callStatic.simulateValidation(userOp, { gasLimit: 10e6 }).catch(e => e)
+    const chainId = (await this.provider.getNetwork()).chainId;
+    const errorResult = await this.entryPoint.callStatic.simulateValidation(userOp, { gasLimit: chainId === 42161 ? 3e7 : 10e6 }).catch(e => e)
     return this._parseErrorResult(userOp, errorResult)
   }
 
