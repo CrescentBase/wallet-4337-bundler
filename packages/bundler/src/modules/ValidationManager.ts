@@ -57,7 +57,7 @@ export class ValidationManager {
     if (!errorResult?.errorName?.startsWith('ValidationResult')) {
       // parse it as FailedOp
       // if its FailedOp, then we have the paymaster param... otherwise its an Error(string)
-      let paymaster = errorResult.errorArgs.paymaster
+      let paymaster = errorResult.errorArgs?.paymaster
       if (paymaster === AddressZero) {
         paymaster = undefined
       }
