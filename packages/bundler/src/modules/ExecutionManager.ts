@@ -85,7 +85,7 @@ export class ExecutionManager {
       const ret = await this.bundleManager.sendNextBundle()
       if (this.maxMempoolSize === 0) {
         // in "auto-bundling" mode (which implies auto-mining) also flush mempool from included UserOps
-        await this.bundleManager.handlePastEvents()
+        await this.bundleManager.handlePastEvents().catch(e => { debug('handlePastEvents e', e); })
       }
       return ret
     }
