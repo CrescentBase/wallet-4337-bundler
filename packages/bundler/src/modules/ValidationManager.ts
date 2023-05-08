@@ -53,7 +53,7 @@ export class ValidationManager {
   // standard eth_call to simulateValidation
   async _callSimulateValidation (userOp: UserOperation): Promise<ValidationResult> {
     const chainId = (await this.provider.getNetwork()).chainId;
-    const errorResult = await this.entryPoint.callStatic.simulateValidation(userOp, { gasLimit: chainId === 42161 ? 3e7 : 10e6 }).catch(e => e)
+    const errorResult = await this.entryPoint.callStatic.simulateValidation(userOp, { gasLimit: chainId === 42161 ? 80e6 : 10e6 }).catch(e => e)
     return this._parseErrorResult(userOp, errorResult)
   }
 
