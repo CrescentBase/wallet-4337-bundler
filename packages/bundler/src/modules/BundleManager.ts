@@ -70,7 +70,7 @@ export class BundleManager {
     await this.eventsManager.handlePastEvents()
   }
 
-  async getGasLimit(userOps: UserOperation[], chainId) : Promise<BigNumber | number> {
+  async getGasLimit(userOps: UserOperation[], chainId: number) : Promise<BigNumber | number> {
     let totalGas = BigNumber.from(0);
     for (const userOp of userOps) {
       totalGas = totalGas.add(userOp.callGasLimit).add(userOp.verificationGasLimit).add(55000);
